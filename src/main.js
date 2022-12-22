@@ -2,7 +2,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
-import firebase from 'firebase/compat/app'
+import { initializeApp } from 'firebase/app'
+import './assets/index.css'
 
 // firebase config
 var firebaseConfig = {
@@ -14,7 +15,7 @@ var firebaseConfig = {
   messagingSenderId: "947044543672",
   appId: "1:947044543672:web:0729b2a36ca5215708584d"
 };
-firebase.initializeApp(firebaseConfig);
-window.firebase = firebase;
+
+initializeApp(firebaseConfig);
 
 createApp(App).use(store).use(router).mount('#app')
