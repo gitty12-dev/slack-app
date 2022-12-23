@@ -16,6 +16,7 @@ var firebaseConfig = {
   appId: "1:947044543672:web:0729b2a36ca5215708584d"
 };
 
-initializeApp(firebaseConfig);
 
 createApp(App).use(store).use(router).mount('#app')
+
+initializeApp(firebaseConfig);
