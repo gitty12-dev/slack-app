@@ -20,9 +20,9 @@
         <div class="font-bold opacity-50 text-lg">ダイレクトメッセージ</div>
         <PlusCircleIcon />
       </div>
-      <div class="mt-2 flex items-center" v-for="user in users" :key="user.id">
+      <div class="mt-2 flex items-center" v-for="(user, idx) in users" :key="idx">
         <span class="bg-yellow-400 rounded-full w-3 h-3 mr-2"></span>
-        <div class="opacity-50">{{ user.user_email }}</div>
+        <div class="opacity-50" @click="directMessage(user)">{{ user.email }}</div>
       </div>
     </div>
 
@@ -30,7 +30,7 @@
       <header class="border-b">
         <div class="flex justify-between items-center m-3">
           <div>
-            <div class="font-bold text-lg">{{ user.email }}</div>
+            <div class="font-bold text-lg">{{ channel_name }}</div>
             <StarIcon />
           </div>
           <div class="flex items-center text-gray-700">
@@ -50,15 +50,23 @@
         </div>
       </header>
 
-      <main class="overflow-y-scroll flex-grow">
+      <main class="flex-grow">
         <div class="flex flex-col ml-6 h-full">
           <div class="flex-grow overflow-y-scroll">
-            <p>メッセージ一覧</p>
+            <div class="mt-2 mb-4 flex" v-for="message in messages" :key="message.key">
+              <AvaterView :user="message.user"/>
+              <div class="ml-2 text-left">
+                <div class="font-bold">{{ message.user }}</div>
+                <div>{{ message.content }}</div>
+              </div>
+            </div>
           </div>
           <div class="border border-gray-900 rounded mb-4">
-            <textarea class="w-full pt-4 pl-8 outline-none" placeholder="XXXXへのメッセージ"></textarea>
+            <textarea class="w-full pt-4 pl-8 outline-none" :placeholder="placeholder"
+             v-model="message"></textarea>
             <div class="text-left bg-gray-100 p-2">
-              <button class="bg-green-900 text-sm text-white font-bold py-1 px-2 rounded">送信</button>
+              <button class="bg-green-900 text-sm text-white font-bold py-1 px-2 rounded"
+               @click="sendMessage()">送信</button>
             </div>
           </div>
         </div>
@@ -70,6 +78,7 @@
 
 <script>
 import { getAuth, signOut } from 'firebase/auth'
+import { getDatabase, ref, push, set, child, onChildAdded, off, serverTimestamp } from 'firebase/database'
 import NotificationIcon from '../components/icons/NotificationIcon.vue'
 import PlusCircleIcon from '../components/icons/PlusCircleIcon.vue'
 import SearchIcon from "../components/icons/SearchIcon.vue";
@@ -78,22 +87,24 @@ import CogIcon from "../components/icons/CogIcon.vue";
 import PhoneIcon from "../components/icons/PhoneIcon.vue";
 import InformationIcon from "../components/icons/InformationIcon.vue";
 import AtSymbolIcon from "../components/icons/AtSymbolIcon.vue";
+import AvaterView from "../components/Avator.vue"
 
 export default {
   name: 'HomeView',
   data() {
     return {
       user: "",
+      users: [],
       channels: [
         {id: 1, name: "営業"},
         {id: 2, name: "事務"},
         {id: 3, name: "情シス"},
       ],
-      users: [
-        {id: 11, user_email: "xxxx@gmail.com"},
-        {id: 12, user_email: "yyyy@gmail.com"},
-        {id: 13, user_email: "zzzz@gmail.com"},
-      ]
+      channel_id: "",
+      channel_name: "",
+      message: "",
+      messages: [],
+      placeholder: "",
     }
   },
   components: {
@@ -105,15 +116,62 @@ export default {
     PhoneIcon,
     InformationIcon,
     AtSymbolIcon,
+    AvaterView,
   },
   methods: {
+    // サインアウト処理
     signout() {
       signOut(getAuth());
       this.$router.push('/signin')
+    },
+    // ダイレクトメッセージ アドレス選択処理
+    directMessage(user) {
+      this.messages = [];
+      // チャンネルID設定(対象のuidを連結した値)
+      this.user.uid > user.user_id
+        ? (this.channel_id = this.user.uid + "-" + user.user_id)
+        : (this.channel_id = user.user_id + "-" + this.user.uid);
+      // 初期処理：リスナー削除
+      if (this.channel_id != "") {
+        off(ref(getDatabase(), "messages"));
+      }
+      // 初期処理：表示設定
+      this.channel_name = user.email;
+      this.placeholder = user.email + "へのメッセージ";
+      // 既存メッセージの取得
+      onChildAdded(ref(getDatabase(), "messages/" + this.channel_id), (snap) => {
+        this.messages.push(snap.val());
+      });
+    },
+    // メッセージ送信処理
+    sendMessage() {
+      const db = getDatabase();
+      const newMessage = push(child(ref(db), 'messages/' + this.channel_id));
+      const key_id = newMessage.key;
+
+      set(newMessage, {
+        key: key_id,
+        content: this.message,
+        user: this.user.email,
+        createdAt: serverTimestamp(),
+      });
+
+      this.message = "";
     }
   },
   mounted() {
+    // 初期表示：自ユーザ情報保存
     this.user = getAuth().currentUser;
+    // 初期表示：ダイレクトメッセージ一覧保存
+    onChildAdded(ref(getDatabase(), "users"), (snap) => {
+      this.users.push(snap.val());
+      // console.log(snap.val());
+    });
+  },
+  beforeUnmount() {
+    // 終了時：リスナー削除
+    off(ref(getDatabase(), "users"));
+    off(ref(getDatabase(), "messages/" + this.channel_id));
   }
   
 }

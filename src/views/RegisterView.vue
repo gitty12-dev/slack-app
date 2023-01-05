@@ -22,6 +22,13 @@
               <div class="mb-2">
                 <input type="password" v-model="password" class="text-xl w-3/5 p-3 border rounded" placeholder="パスワード"/>
               </div>
+              <div v-if="errors.length">
+                <ul class="my-4">
+                  <li class="font-semibold text-red-700" v-for="(error, index) in errors" :key="index">
+                    {{ error }}
+                  </li>
+                </ul>
+              </div>
               <button type="submit" class="text-xl w-3/5 bg-green-800 text-white py-2 rounded">ユーザの登録</button>
             </form>
           </div>
@@ -34,6 +41,7 @@
 <script>
 // v9 compat pakages
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getDatabase, ref, set } from "firebase/database"
 
 export default {
   name: 'RegisterView',
@@ -41,6 +49,7 @@ export default {
     return {
       email: "",
       password: "",
+      errors: [],
     };
   },
   methods: {
@@ -48,11 +57,25 @@ export default {
       // console.log(this.email, this.password);
       createUserWithEmailAndPassword(getAuth(), this.email, this.password)
         .then(response => {
-          console.log(response);
-          this.$router.push('/');
+          const user = response.user;
+          set(ref(getDatabase(), "users/" + user.uid), {
+            user_id: user.uid,
+            email: user.email,
+          })
+            .then(() => {
+              this.$router.push('/');
+            })
+            .catch(e => {
+              console.log(e);
+            });
         })
         .catch(e => {
           console.log("ERROR : " + e);
+          if (e.code == "auth/email-already-in-use") {
+            this.errors.push("入力したメールアドレスは登録済です。");
+          } else {
+            this.errors.push("入力したメールアドレスかパスワードに問題があります。");
+          }
         });
     }
   }

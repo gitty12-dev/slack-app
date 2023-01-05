@@ -24,7 +24,13 @@
               </div>
               <button type="submit" class="text-xl w-3/5 bg-green-800 text-white py-2 rounded">サインイン</button>
             </form>
-            <span class="my-2 font-bold text-red-500">{{ errorMsg }}</span>
+            <div v-if="errors.length">
+              <ul class="my-4">
+                <li v-for="(error, idx) in errors" :key="idx" class="font-semibold text-red-700">
+                  {{ error }}
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -42,7 +48,7 @@ export default {
     return {
       email: "",
       password: "",
-      errorMsg: "",
+      errors: [],
     }
   },
   methods: {
@@ -52,9 +58,9 @@ export default {
           console.log(response);
           this.$router.push("/");
         })
-        .catch(e => {
-          console.log("ERROR: " + e);
-          this.errorMsg = "ユーザ名 または パスワードが間違えています";
+        .catch(() => {
+          this.password = "";
+          this.errors.push("ユーザ名 または パスワードが間違えています");
         })
     }
   }
