@@ -42,7 +42,7 @@
         <PlusCircleIcon />
       </div>
       <div class="mt-2 flex items-center" v-for="(user, idx) in users" :key="idx">
-        <span class="bg-yellow-400 rounded-full w-3 h-3 mr-2"></span>
+        <span class="rounded-full w-3 h-3 mr-2" :class="getStatusColor(user)"></span>
         <div class="opacity-50" @click="directMessage(user)">{{ user.email }}</div>
       </div>
     </div>
@@ -99,7 +99,7 @@
 
 <script>
 import { getAuth, signOut } from 'firebase/auth'
-import { getDatabase, ref, push, set, child, onChildAdded, off, serverTimestamp } from 'firebase/database'
+import { getDatabase, ref, push, set, child, onChildAdded, off, serverTimestamp, onValue, remove, onDisconnect, onChildRemoved } from 'firebase/database'
 import NotificationIcon from '../components/icons/NotificationIcon.vue'
 import PlusCircleIcon from '../components/icons/PlusCircleIcon.vue'
 import SearchIcon from "../components/icons/SearchIcon.vue";
@@ -125,6 +125,10 @@ export default {
 
       isChannelModal: false,
       new_channel: "",
+
+      connectionRef: child(ref(getDatabase()), 'connections'),
+      connection_key: "",
+      connections: [],
     }
   },
   components: {
@@ -141,6 +145,7 @@ export default {
   methods: {
     // サインアウト処理
     signout() {
+      remove(child(this.connectionRef, this.connection_key));
       signOut(getAuth());
       this.$router.push('/signin')
     },
@@ -217,26 +222,76 @@ export default {
           this.isChannelModal = false;
         }
       );
+    },
+    getStatusColor(user) {
+      return (user.status == "online") ? 'bg-yellow-400' : 'bg-gray-600';
     }
   },
   mounted() {
+    // 初期変数
+    const db = getDatabase();
     // 初期表示：自ユーザ情報保存
     this.user = getAuth().currentUser;
     // 初期表示：チャンネル一覧読込
-    onChildAdded(ref(getDatabase(), "channels"), (snap) => {
+    onChildAdded(ref(db, "channels"), (snap) => {
       this.channels.push(snap.val());
-      // console.log(snap.val());
     });
     // 初期表示：ダイレクトメッセージ一覧読込
-    onChildAdded(ref(getDatabase(), "users"), (snap) => {
-      this.users.push(snap.val());
-      // console.log(snap.val());
+    onChildAdded(ref(db, "users"), (snap) => {
+      let user = snap.val();
+      if (this.user.uid === user.user_id) {
+        user.status = "online";
+      } else {
+        user.status = "offline";
+      }
+      this.users.push(user);
     });
+    onValue(ref(db, ".info/connected"), (snap) => {
+      if(snap.val() === true) {
+        let ref = push(this.connectionRef);
+        this.connection_key = ref.key;
+        onDisconnect(ref).remove();
+        set(ref, {
+          user_id: this.user.uid,
+          key: this.connection_key,
+        });
+      }
+    });
+    onChildAdded(ref(db, "connections"), (snap) => {
+      var new_connecton = snap.val();
+      // vue上のconnectionsの追加
+      this.connections.push(new_connecton);
+      // vueのusersの更新(online)
+      var user = this.users.find(
+        usr => usr.user_id === new_connecton.user_id
+      );
+      if(user != undefined) {
+        user.status == "online";
+      }
+    });
+    onChildRemoved(ref(db, "connections"), (snap => {
+      let remove_connection = snap.val();
+      // vue上のconnectionsの除去
+      this.connections = this.connections.filter(
+        connection => connection.key !== remove_connection.key
+      );
+      // vueのusersの更新(offline)
+      let index = this.connections.findIndex(connection => {
+        return connection.user_id === remove_connection.user_id;
+      });
+      if (index === -1) {
+        let user = this.users.find(
+          user => user.user_id == remove_connection.user_id
+        );
+        user.status = "offline";
+      }
+    }))
   },
   beforeUnmount() {
     // 終了時：リスナー削除
     off(ref(getDatabase(), "users"));
     off(ref(getDatabase(), "messages/" + this.channel_id));
+    off(ref(getDatabase(), ".info/connected"));
   }
   
 }
