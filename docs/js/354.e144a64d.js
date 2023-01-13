@@ -1,0 +1,2 @@
+"use strict";(self["webpackChunkvue_slack_clone"]=self["webpackChunkvue_slack_clone"]||[]).push([[354],{5354:function(n,e,u){u.r(e),u.d(e,{default:function(){return f}});var a=u(3396);const c={class:"about"},s=(0,a._)("h1",null,"This is an about page",-1),t=[s];function r(n,e,u,s,r,l){return(0,a.wg)(),(0,a.iD)("div",c,t)}var l={name:"AboutView"},o=u(89);const i=(0,o.Z)(l,[["render",r]]);var f=i}}]);
+//# sourceMappingURL=354.e144a64d.js.map
